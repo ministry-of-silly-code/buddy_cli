@@ -1,7 +1,7 @@
 import argparse
 import inspect
 import os
-from typing import Optional, Callable, Union, Dict, Any
+from typing import Callable, Union, Dict, Any
 
 from halo import Halo
 
@@ -10,11 +10,22 @@ class FatalException(Exception):
     pass
 
 
-def exec_in_venv(python_command):
-    os.system(f'venv/bin/python {python_command}')
+def coalesce(*arg):
+    for el in arg:
+        if el is not None:
+            return el
+    return None
+
+
+def get_fn_parameters(action):
+    if hasattr(action, 'func'):
+        return list(set(inspect.signature(action).parameters) - set(action.keywords.keys()))
+    else:
+        return list(inspect.signature(action).parameters)
 
 
 class WorkingDirectory:
+
     def __init__(self, *, path, force):
         if force:
             os.system(f"rm -rf {path}")
@@ -33,42 +44,41 @@ class WorkingDirectory:
         os.chdir(self.current_path)
 
 
-def prompt_bool(action: Callable[[], None], parsed_args: Dict[str, Any]):
-    force_to = parsed_args[action.__name__]
+def prompt(action: Union[Callable[[], None], Callable[[str], None]],
+           parsed_args: Dict[str, Any],
+           force=None):
+    def unsnake(string):
+        return string.replace('_', ' ')
 
-    if force_to is None:
-        apply = input(f"Do you want to {action.__name__.replace('_', ' ')}? [Yn] ") in ['', 'y', 'Y']
-    else:
-        apply = force_to
+    action_name = getattr(action, 'func', action).__name__
+    param_names = get_fn_parameters(action)
+
+    apply = coalesce(force, parsed_args[action_name])
+    if apply is None:
+        if param_names:
+            apply = input(f"Do you want to {unsnake(action_name)}? "
+                          f"Insert your {unsnake(param_names[0])} [Leave empty to skip]: ")
+        else:
+            apply = input(f"Do you want to {unsnake(action_name)}? [Yn] ") in ['', 'y', 'Y']
 
     if apply:
-        with Halo(text=action.__name__.replace('_', ' '), spinner='dots'):
-            action()
+        with Halo(text=unsnake(action_name), spinner='bouncingBar'):
+            if param_names:
+                action(**{param_names[0]: apply})
+            else:
+                action()
 
     return apply
 
 
-def prompt_string(action: Callable[[str], None], prompt: str, parsed_args: Dict[str, Any]):
-    force_to = parsed_args[action.__name__]
-
-    if force_to is None:
-        param = input(f"Do you want to {action.__name__.replace('_', ' ')}? {prompt} [Leave empty to skip]")
-    else:
-        param = force_to
-
-    if param:
-        with Halo(text=action.__name__.replace('_', ' '), spinner='dots'):
-            action(param)
-
-    return param
-
-
 def add_action_toggle(self, fn: Union[Callable[[], None], Callable[[str], None]]):
-    params = list(inspect.signature(fn).parameters.keys())
+    params = get_fn_parameters(fn)
+    docs = getattr(fn, 'func', fn).__doc__
+    name = getattr(fn, 'func', fn).__name__
     if params:
-        self.add_argument(f'--{fn.__name__}', help=fn.__doc__, default=None)
+        self.add_argument(f'--{name}', help=docs, default=None, metavar=params[0])
     else:
-        self.add_argument(f'--{fn.__name__}', help=fn.__doc__, action='store_true', default=None)
+        self.add_argument(f'--{name}', help=docs, action='store_true', default=None)
 
 
 argparse.ArgumentParser.add_action_toggle = add_action_toggle

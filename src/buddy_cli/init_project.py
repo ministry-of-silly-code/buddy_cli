@@ -1,7 +1,7 @@
 import shutil
 import subprocess
 import traceback
-from os.path import expanduser
+from functools import partial
 
 import fabric
 import paramiko
@@ -11,27 +11,20 @@ import venv
 import argparse
 from distutils.dir_util import copy_tree
 
-from .init_framework import FatalException, WorkingDirectory, prompt_bool, prompt_string
+from .init_framework import FatalException, WorkingDirectory, prompt
 
 
 def create_venv():
     """Create the experiment venv and initializes all the base dependencies"""
     venv.EnvBuilder(with_pip=True).create('venv')
     subprocess.check_output(f'venv/bin/python3 -m pip install --upgrade pip', shell=True)
-    print(f"""
-    
-    Remember to source your new environment with:
-        source {os.getcwd()}/venv/bin/activate
-    """)
+    print(f"""\n\nRemember to source your new environment with:
+        source {os.getcwd()}/venv/bin/activate\n\n""")
 
 
 def create_git_repo():
     """Setups the git repo with the proper git ignores"""
-    GIT_IGNORE = """venv"""
-
     Repo.init('./.git', bare=True)
-    with open(".gitignore", "w") as gitignore:
-        gitignore.write(GIT_IGNORE)
 
 
 def create_base_structure():
@@ -41,7 +34,8 @@ def create_base_structure():
     subprocess.check_output(f'venv/bin/python3 -m pip install -r requirements.txt', shell=True)
 
 
-def setup_mila_user(mila_user):
+def setup_mila_user(mila_user: str):
+    """One time setup to connect with the Mila servers"""
     try:
         fabric.Connection(host='login.server.mila.quebec', user=mila_user, connect_timeout=10).run("")
     except paramiko.ssh_exception.SSHException:
@@ -50,7 +44,7 @@ Error while checking SSH connection, stopping
 Did you:
  - double check that your username is '{mila_user}'?
  - setup the public and private key for you and for the mila cluster?
-        """)
+""")
         raise FatalException()
 
     mila_config = f"""
@@ -74,7 +68,7 @@ Match host *.mila.quebec,*.umontreal.ca
     ServerAliveInterval 120
     ServerAliveCountMax 5
 """
-    config_path = expanduser('~/.ssh/config')
+    config_path = os.path.expanduser('~/.ssh/config')
     with open(config_path, mode='r') as config_file:
         current_config = config_file.read()
 
@@ -84,34 +78,39 @@ Match host *.mila.quebec,*.umontreal.ca
             config_file.write(current_config + mila_config)
 
 
-def setup_wandb():
+def setup_wandb(project_name: str, wand_db_key: str):
+    """Initialize the wandb project in the current directory"""
     subprocess.check_output(f'venv/bin/python3 -m pip install wandb', shell=True)
-    subprocess.check_output(f'venv/bin/python3 -m wandb init', shell=True)
+    subprocess.check_output(f'venv/bin/python3 -m wandb init -p {project_name}', shell=True)
 
 
 def init(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--destination", help="The destination of your epic project! :D", required=True)
     parser.add_argument('--force', help="Starts the project from scratch", action='store_true', default=False)
+    parser.add_argument('--yes', '-y', help="Forces all boolean options to true", action='store_true', default=None)
 
     parser.add_action_toggle(setup_mila_user)
     parser.add_action_toggle(create_venv)
     parser.add_action_toggle(create_git_repo)
     parser.add_action_toggle(create_base_structure)
-    parser.add_action_toggle(setup_wandb)
+    parser.add_action_toggle(partial(setup_wandb, project_name=""))
 
     parsed = vars(parser.parse_args(args=args))
 
     base_dir = parsed['destination']
 
+    prompt_with_args = partial(prompt, parsed_args=parsed)
+
     with WorkingDirectory(path=base_dir, force=parsed['force']):
         os.mkdir("src")
 
-        prompt_string(setup_mila_user, prompt='Insert your Mila username', parsed_args=parsed)
-        prompt_bool(create_venv, parsed_args=parsed)
-        prompt_bool(create_git_repo, parsed_args=parsed)
-        prompt_bool(create_base_structure, parsed_args=parsed)
-        prompt_bool(setup_wandb, parsed_args=parsed)
+        prompt_with_args(create_git_repo, force=parsed['force'])
+        prompt_with_args(create_venv, force=parsed['force'])
+        prompt_with_args(create_base_structure, force=parsed['force'])
+
+        prompt_with_args(setup_mila_user)
+        prompt_with_args(partial(setup_wandb, project_name=base_dir))
 
 
 def sys_main():
