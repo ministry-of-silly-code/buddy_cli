@@ -1,3 +1,4 @@
+import pathlib
 import shutil
 import subprocess
 import traceback
@@ -31,21 +32,21 @@ def create_base_structure():
     """initializes the base example"""
     base_skeleton_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'base_skeleton')
     copy_tree(base_skeleton_path, '.')
-    subprocess.check_output(f'venv/bin/python3 -m pip install -r requirements.txt', shell=True)
+    res = subprocess.check_output(f'venv/bin/python3 -m pip install -r requirements.txt', shell=True)
+    print(res)
 
 
 def setup_mila_user(mila_user: str):
     """One time setup to connect with the Mila servers"""
     try:
-        fabric.Connection(host='login.server.mila.quebec', user=mila_user, connect_timeout=10).run("")
+        fabric.Connection(host='login.server.mila.quebec', user=mila_user, connect_timeout=10, port=2222).run("")
     except paramiko.ssh_exception.SSHException:
-        print(f"""
+        raise FatalException(f"""
 Error while checking SSH connection, stopping
 Did you:
  - double check that your username is '{mila_user}'?
  - setup the public and private key for you and for the mila cluster?
 """)
-        raise FatalException()
 
     mila_config = f"""
 Host mila1
@@ -63,19 +64,19 @@ Host mila*
 
 Match host *.mila.quebec,*.umontreal.ca
     User {mila_user}
-    PreferredAuthentications publickey,keyboard-interactive
+    PreferredAuthentications publickey
     Port 2222
     ServerAliveInterval 120
     ServerAliveCountMax 5
 """
     config_path = os.path.expanduser('~/.ssh/config')
-    with open(config_path, mode='r') as config_file:
-        current_config = config_file.read()
+    pathlib.Path(config_path).touch()
+
+    current_config = pathlib.Path(config_path).read_text()
 
     if 'Host mila' not in current_config:
         shutil.copy(config_path, f'{config_path}_BACKUP')
-        with open(config_path, mode='w') as config_file:
-            config_file.write(current_config + mila_config)
+        pathlib.Path(config_path).write_text(f'{current_config}\n{mila_config}')
 
 
 def setup_wandb(project_name: str, wand_db_key: str):
@@ -105,20 +106,20 @@ def init(args=None):
     with WorkingDirectory(path=base_dir, force=parsed['force']):
         os.mkdir("src")
 
-        prompt_with_args(create_git_repo, force=parsed['force'])
-        prompt_with_args(create_venv, force=parsed['force'])
-        prompt_with_args(create_base_structure, force=parsed['force'])
-
         prompt_with_args(setup_mila_user)
         prompt_with_args(partial(setup_wandb, project_name=base_dir))
+
+        prompt_with_args(create_git_repo, force=parsed['yes'])
+        prompt_with_args(create_venv, force=parsed['yes'])
+        prompt_with_args(create_base_structure, force=parsed['yes'])
 
 
 def sys_main():
     try:
         init()
         return 0
-    except Exception:
-        print(traceback.format_exc())
+    except Exception as e:
+        print(e)
         return 1
 
 

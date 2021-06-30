@@ -2,7 +2,8 @@ import argparse
 import inspect
 import os
 from typing import Callable, Union, Dict, Any
-
+from shutil import which
+from functools import wraps
 from halo import Halo
 
 
@@ -10,11 +11,24 @@ class FatalException(Exception):
     pass
 
 
-def coalesce(*arg):
-    for el in arg:
-        if el is not None:
-            return el
-    return None
+def log_output(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        with open('/tmp/buddy-init.log', 'a'):
+            return fn(*args, **kwargs)
+
+    return wrapper()
+
+
+def preflight_check():
+    if which('ssh') is None:
+        raise FatalException('missing ssh, you can install it with "sudo apt install openssl-client"')
+    if which('git') is None:
+        raise FatalException('missing ssh, you can install it with "sudo apt install git"')
+
+
+def coalesce(*args):
+    return next((i for i in args if i is not None), None)
 
 
 def get_fn_parameters(action):
@@ -29,7 +43,7 @@ class WorkingDirectory:
     def __init__(self, *, path, force):
         if force:
             os.system(f"rm -rf {path}")
-        elif os.listdir(path):
+        elif os.path.exists(path) and os.listdir(path):
             raise Exception("The directory exists and it's not empty")
 
         os.makedirs(path)
@@ -76,7 +90,7 @@ def add_action_toggle(self, fn: Union[Callable[[], None], Callable[[str], None]]
     docs = getattr(fn, 'func', fn).__doc__
     name = getattr(fn, 'func', fn).__name__
     if params:
-        self.add_argument(f'--{name}', help=docs, default=None, metavar=params[0])
+        self.add_argument(f'--{name}', help=docs, default=None, metavar=params[0].upper())
     else:
         self.add_argument(f'--{name}', help=docs, action='store_true', default=None)
 
