@@ -1,8 +1,16 @@
 FROM python:3-slim
 
+ARG ssh_prv_key
+ARG ssh_pub_key
+
+RUN mkdir /root/.ssh && chmod 700 /root/.ssh
+RUN echo "$ssh_prv_key" > /root/.ssh/id_rsa && \
+    echo "$ssh_pub_key" > /root/.ssh/id_rsa.pub && \
+    chmod 600 /root/.ssh/id_rsa && \
+    chmod 600 /root/.ssh/id_rsa.pub
+
 RUN apt-get update
 RUN apt-get install git openssh-client -y
-RUN mkdir ~/.ssh && chmod 700 ~/.ssh
 
 # Speed up install process
 RUN pip install halo paramiko fabric gitpython
