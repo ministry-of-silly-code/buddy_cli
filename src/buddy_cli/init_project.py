@@ -32,8 +32,7 @@ def create_base_structure():
     """initializes the base example"""
     base_skeleton_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'base_skeleton')
     copy_tree(base_skeleton_path, '.')
-    res = subprocess.check_output(f'venv/bin/python3 -m pip install -r requirements.txt', shell=True)
-    print(res)
+    subprocess.check_output(f'venv/bin/python3 -m pip install -r requirements.txt', shell=True)
 
 
 def setup_mila_user(mila_user: str):
