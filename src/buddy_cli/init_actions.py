@@ -55,7 +55,7 @@ Match host *.mila.quebec,*.umontreal.ca
     ServerAliveInterval 120
     ServerAliveCountMax 5
 """
-    config_path = os.path.expanduser('~/.ssh/config')
+    config_path = os.path.expanduser('~/.ssh/config_mila')
     pathlib.Path(config_path).touch()
 
     current_config = pathlib.Path(config_path).read_text()
@@ -65,7 +65,7 @@ Match host *.mila.quebec,*.umontreal.ca
         pathlib.Path(config_path).write_text(f'{current_config}\n{mila_config}')
 
     try:
-        fabric.Connection(host='mila').run("")
+        fabric.Connection(host='mila', config=fabric.Config(user_ssh_path=config_path)).run("")
     except paramiko.ssh_exception.SSHException:
         shutil.copy(f'{config_path}_BACKUP', config_path)
         raise FatalException(f"""
