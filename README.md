@@ -12,7 +12,7 @@ pip install -e ./buddy-cli
 
 ### Directly from pip
 ```shell
-pip install -e https://github.com/ministry-of-silly-code/buddy_cli.git
+pip install git+https://github.com/ministry-of-silly-code/buddy_cli.git@master\#egg\=buddy_cli
 ```
 
 ## Usage
