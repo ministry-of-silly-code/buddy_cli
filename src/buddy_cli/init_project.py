@@ -3,7 +3,7 @@ from functools import partial
 import argparse
 
 from .init_actions import *
-from .init_framework import WorkingDirectory, prompt
+from .init_framework import WorkingDirectory, prompt, add_action_toggle
 
 
 def init(args=None):
@@ -12,11 +12,11 @@ def init(args=None):
     parser.add_argument('--force', help="Starts the project from scratch", action='store_true', default=False)
     parser.add_argument('--yes', '-y', help="Forces all boolean options to true", action='store_true', default=None)
 
-    parser.add_action_toggle(setup_mila_user)
-    parser.add_action_toggle(create_venv)
-    parser.add_action_toggle(create_git_repo)
-    parser.add_action_toggle(create_base_structure)
-    parser.add_action_toggle(partial(setup_wandb, project_name=""))
+    add_action_toggle(parser, setup_mila_user)
+    add_action_toggle(parser, create_venv)
+    add_action_toggle(parser, create_git_repo)
+    add_action_toggle(parser, create_base_structure)
+    add_action_toggle(parser, partial(setup_wandb, project_name=""))
 
     parsed = vars(parser.parse_args(args=args))
 

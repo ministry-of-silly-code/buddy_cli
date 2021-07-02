@@ -85,14 +85,11 @@ def prompt(action: Union[Callable[[], None], Callable[[str], None]],
     return apply
 
 
-def add_action_toggle(self, fn: Union[Callable[[], None], Callable[[str], None]]):
+def add_action_toggle(parser, fn: Union[Callable[[], None], Callable[[str], None]]):
     params = get_fn_parameters(fn)
     docs = getattr(fn, 'func', fn).__doc__
     name = getattr(fn, 'func', fn).__name__
     if params:
-        self.add_argument(f'--{name}', help=docs, default=None, metavar=params[0].upper())
+        parser.add_argument(f'--{name}', help=docs, default=None, metavar=params[0].upper())
     else:
-        self.add_argument(f'--{name}', help=docs, action='store_true', default=None)
-
-
-argparse.ArgumentParser.add_action_toggle = add_action_toggle
+        parser.add_argument(f'--{name}', help=docs, action='store_true', default=None)
