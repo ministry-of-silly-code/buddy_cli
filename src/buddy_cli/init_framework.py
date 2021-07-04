@@ -24,7 +24,9 @@ def preflight_check():
     if which('ssh') is None:
         raise FatalException('missing ssh, you can install it with "sudo apt install openssl-client"')
     if which('git') is None:
-        raise FatalException('missing ssh, you can install it with "sudo apt install git"')
+        raise FatalException('missing git, you can install it with "sudo apt install git"')
+    if which('pip') is None:
+        raise FatalException('missing pip, you can install it with "sudo apt install python-pip"')
 
 
 def coalesce(*args):

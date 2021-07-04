@@ -12,8 +12,12 @@ from git import Repo
 from .init_framework import FatalException
 
 
+def is_venv():
+    return bool(os.environ.get('VIRTUAL_ENV'))
+
+
 def create_venv():
-    """Create the experiment venv and initializes all the base dependencies"""
+    """Create the experiment venv, otherwhise use the already active venv"""
     venv.EnvBuilder(with_pip=True).create('venv')
     subprocess.check_output(f'venv/bin/python3 -m pip install --upgrade pip', shell=True)
     print(f"""\n\nRemember to source your new environment with:
@@ -25,11 +29,16 @@ def create_git_repo():
     Repo.init('./.git', bare=True)
 
 
-def create_base_structure():
+def create_base_structure(use_local_venv=True):
     """initializes the base example"""
     base_skeleton_path = f'{os.path.dirname(os.path.realpath(__file__))}/base_skeleton'
     dir_util.copy_tree(base_skeleton_path, '.')
-    subprocess.check_output(f'venv/bin/python3 -m pip install -r requirements.txt', shell=True)
+    if use_local_venv:
+        subprocess.check_output(f'venv/bin/python3 -m pip install -r requirements.txt', shell=True)
+    elif is_venv():
+        subprocess.check_output(f'python3 -m pip install -r requirements.txt', shell=True)
+    else:
+        raise FatalException('Installing packages on the system python is not allowed. Aborting')
 
 
 def setup_mila_user(mila_user: str):
